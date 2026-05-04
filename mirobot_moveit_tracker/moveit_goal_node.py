@@ -41,7 +41,25 @@ class MoveItGoalNode(Node):
         self.execute_motion = bool(self.get_parameter("execute").value)
         self.ignore_same_goal = bool(self.get_parameter("ignore_same_goal").value)
 
-        self._last_goal = None  # type: Optional[PoseStamped]
+        self.get_logger().info(
+            "MoveItGoalNode parameter \n"
+            "  group        : %s\n"
+            "  base_link    : %s\n"
+            "  end_effector : %s\n"
+            "  joint_names  : %s\n"
+            "  cartesian    : %s\n"
+            "  execute      : %s"
+            % (
+                self.group_name,
+                self.base_link_name,
+                self.end_effector_name,
+                self.joint_names,
+                self.cartesian,
+                self.execute_motion,
+            )
+        )
+        
+        self._last_goal: Optional[PoseStamped] = None  # type: Optional[PoseStamped]
         self._busy = False
         self._lock = threading.Lock()
 
