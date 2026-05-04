@@ -25,6 +25,7 @@ def generate_launch_description():
         DeclareLaunchArgument("group_name", default_value="mirobot_group"),
         DeclareLaunchArgument("base_link_name", default_value="base_link"),
         DeclareLaunchArgument("end_effector_name", default_value="link6"),
+        DeclareLaunchArgument("joint_names", default_value="[joint1, joint2, joint3, joint4, joint5, joint6]",
         DeclareLaunchArgument("cartesian", default_value="false"),
         DeclareLaunchArgument("cartesian_max_step", default_value="0.0025"),
         DeclareLaunchArgument("cartesian_fraction_threshold", default_value="0.0"),
