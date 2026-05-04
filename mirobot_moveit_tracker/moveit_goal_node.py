@@ -78,7 +78,7 @@ class MoveItGoalNode(Node):
             10,
         )
 
-    def goal_pose_callback(self, msg):
+    def goal_callback(self, msg:PoseStamped):
         self.get_logger().info(
             "Received MoveIt goal request: frame=%s x=%.4f y=%.4f z=%.4f"
             % (
@@ -100,14 +100,14 @@ class MoveItGoalNode(Node):
 
             self._busy = True
 
-        worker = threading.Thread(
+        thread = threading.Thread(
             target=self._process_goal,
             args=(copy.deepcopy(msg),),
             daemon=True,
         )
-        worker.start()
+        thread.start()
 
-    def _process_goal(self, goal_pose):
+    def _process_goal(self, goal_pose: PoseStamped):
         try:
             self.send_goal_to_moveit(goal_pose)
             self._last_goal = copy.deepcopy(goal_pose)
@@ -117,7 +117,7 @@ class MoveItGoalNode(Node):
             with self._lock:
                 self._busy = False
 
-    def send_goal_to_moveit(self, goal_pose):
+    def send_to_moveit(self, goal_pose: PoseStamped):
         if not goal_pose.header.frame_id:
             raise ValueError("Goal pose has empty frame_id.")
 
@@ -142,12 +142,7 @@ class MoveItGoalNode(Node):
 
         self.get_logger().info(
             "Goal validated. Ready to send to MoveIt: frame=%s x=%.4f y=%.4f z=%.4f"
-            % (
-                goal_pose.header.frame_id,
-                position[0],
-                position[1],
-                position[2],
-            )
+            % ([round(v, 4) for v in position], [round(v, 4) for v in quat_xyzw])
         )
 
         if self.cartesian:
@@ -174,7 +169,7 @@ class MoveItGoalNode(Node):
             self.get_logger().info("MoveIt goal was submitted without excution wait.")
             
 
-    def _is_same_goal(self, a, b):
+    def _is_same_goal(self, a: PoseStamped, b: Optional[PoseStamped]) -> bool:
         if b is None:
             return False
 
@@ -209,11 +204,16 @@ class MoveItGoalNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = MoveItGoalNode()
+
+    executor = MultiThreadExecutor(num_threads=4)
+    executor.add_node(node)
+    
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:
+        executor.shutdown()
         node.destroy_node()
         rclpy.shutdown()
 
