@@ -84,17 +84,18 @@ class WheelStopToGoalNode(Node):
         raw = PoseStamped()
         raw.header = copy.deepcopy(msg.header)
         raw.pose = copy.deepcopy(msg.poses[0])
-        
-        self.latest_pose = transformed
-
-        if not self.collecting:
-            return
 
         transformed = self._transform_to_goal_frame(copy.deepcopy(raw))
+
         if transformed is None:
             self.get_logger().warn(
-                "TF transpose failed (%d/%d)" % (len(self.sample_buffer), self.sample_count)
+                "TF transform failed." 
             )
+            return
+
+        self.latest_pose = copy.deepcopy(transformed)
+
+        if not self.collecting:
             return
 
         self.sample_buffer.append(copy.deepcopy(transformed))
