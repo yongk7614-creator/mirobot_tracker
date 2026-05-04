@@ -18,7 +18,7 @@ setup(
     zip_safe=True,
     maintainer="user",
     maintainer_email="2022124194@kau.kr",
-    description="ROS 2 Foxy MoveIt goal node for WLKATA Mirobot.",
+    description="ROS 2 Humble MoveIt goal node for WLKATA Mirobot.",
     license="MIT",
     extras_require={
         "test": ["pytest"],
