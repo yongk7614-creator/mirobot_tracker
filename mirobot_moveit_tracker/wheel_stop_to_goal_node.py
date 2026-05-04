@@ -84,7 +84,8 @@ class WheelStopToGoalNode(Node):
         raw = PoseStamped()
         raw.header = copy.deepcopy(msg.header)
         raw.pose = copy.deepcopy(msg.poses[0])
-        self.latest_pose = raw
+        
+        self.latest_pose = transformed
 
         if not self.collecting:
             return
@@ -92,11 +93,11 @@ class WheelStopToGoalNode(Node):
         transformed = self._transform_to_goal_frame(copy.deepcopy(raw))
         if transformed is None:
             self.get_logger().warn(
-                "TF 변환 실패로 샘플 제외 (%d/%d)" % (len(self.sample_buffer), self.sample_count)
+                "TF transpose failed (%d/%d)" % (len(self.sample_buffer), self.sample_count)
             )
             return
 
-        self.sample_buffer.append(transformed)
+        self.sample_buffer.append(copy.deepcopy(transformed))
 
         if len(self.sample_buffer) >= self.sample_count:
             self.publish_averaged_goal()
