@@ -181,13 +181,13 @@ class MoveItGoalNode(Node):
 
         return (
             a.header.frame_id == b.header.frame_id
-            and abs(pa.x - pb.x) < 1e-6
-            and abs(pa.y - pb.y) < 1e-6
-            and abs(pa.z - pb.z) < 1e-6
-            and abs(qa.x - qb.x) < 1e-6
-            and abs(qa.y - qb.y) < 1e-6
-            and abs(qa.z - qb.z) < 1e-6
-            and abs(qa.w - qb.w) < 1e-6
+            and abs(pa.x - pb.x) < 1e-3
+            and abs(pa.y - pb.y) < 1e-3
+            and abs(pa.z - pb.z) < 1e-3
+            and abs(qa.x - qb.x) < 1e-3
+            and abs(qa.y - qb.y) < 1e-3
+            and abs(qa.z - qb.z) < 1e-3
+            and abs(qa.w - qb.w) < 1e-3
         )
 
     @staticmethod
