@@ -81,7 +81,7 @@ class MoveItGoalNode(Node):
 
     def goal_pose_callback(self, msg: PoseStamped):
         self.get_logger().info(
-            "Received MoveIt goal request: pos=%s, quat=%s"
+            "Received MoveIt goal request: frame=%s x=%.4f y=%.4f z=%.4f"
             % (
                 msg.header.frame_id,
                 msg.pose.position.x,
@@ -142,7 +142,7 @@ class MoveItGoalNode(Node):
         quat_xyzw = [qx, qy, qz, qw]
 
         self.get_logger().info(
-            "Goal validated. Ready to send to MoveIt: frame=%s x=%.4f y=%.4f z=%.4f"
+            "Goal validated. Ready to send to MoveIt: pos=%s quat=%s"
             % ([round(v, 4) for v in position], [round(v, 4) for v in quat_xyzw])
         )
 
@@ -167,7 +167,7 @@ class MoveItGoalNode(Node):
             self.moveit2.wait_until_executed()
             self.get_logger().info("MoveIt goal execution completed.")
         else:
-            self.get_logger().info("MoveIt goal was submitted without excution wait.")
+            self.get_logger().info("MoveIt goal was submitted without execution wait.")
             
 
     def _is_same_goal(self, a: PoseStamped, b: Optional[PoseStamped]) -> bool:
