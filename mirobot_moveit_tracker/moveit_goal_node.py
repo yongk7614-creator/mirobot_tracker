@@ -4,6 +4,7 @@ import threading
 from typing import Optional
 
 import rclpy
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 from pymoveit2 import MoveIt2
@@ -59,7 +60,7 @@ class MoveItGoalNode(Node):
             )
         )
         
-        self._last_goal: Optional[PoseStamped] = None  # type: Optional[PoseStamped]
+        self._last_goal: Optional[PoseStamped] = None  
         self._busy = False
         self._lock = threading.Lock()
 
@@ -78,7 +79,7 @@ class MoveItGoalNode(Node):
             10,
         )
 
-    def goal_callback(self, msg:PoseStamped):
+    def goal_pose_callback(self, msg: PoseStamped):
         self.get_logger().info(
             "Received MoveIt goal request: frame=%s x=%.4f y=%.4f z=%.4f"
             % (
@@ -117,7 +118,7 @@ class MoveItGoalNode(Node):
             with self._lock:
                 self._busy = False
 
-    def send_to_moveit(self, goal_pose: PoseStamped):
+    def send_goal_to_moveit(self, goal_pose: PoseStamped):
         if not goal_pose.header.frame_id:
             raise ValueError("Goal pose has empty frame_id.")
 
@@ -205,7 +206,7 @@ def main(args=None):
     rclpy.init(args=args)
     node = MoveItGoalNode()
 
-    executor = MultiThreadExecutor(num_threads=4)
+    executor = MultiThreadedExecutor(num_threads=4)
     executor.add_node(node)
     
     try:
