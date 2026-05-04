@@ -7,38 +7,39 @@ from rclpy.node import Node
 from std_msgs.msg import String
 
 import tf2_ros
-import tf2_geometry_msgs  
+import tf2_geometry_msgs
+
 
 class WheelStopToGoalNode(Node):
     def __init__(self):
         super().__init__("wheel_stop_to_goal_node")
 
         defaults = {
-            "pose_topic": "/aruco_poses",
-            "wheel_status_topic": "/wheel_status",
-            "goal_topic": "/mirobot_goal_pose",
-            "sample_delay_sec": 0.2,
-            "sample_count": 5,
-            "offset_x": 0.0,
-            "offset_y": 0.0,
-            "offset_z": 0.0,
-            "goal_frame": "base_link",
+            "pose_topic":             "/aruco_poses",
+            "wheel_status_topic":     "/wheel_status",
+            "goal_topic":             "/mirobot_goal_pose",
+            "sample_delay_sec":       0.2,
+            "sample_count":           5,
+            "offset_x":               0.0,
+            "offset_y":               0.0,
+            "offset_z":               0.0,
+            "goal_frame":             "base_link",
             "use_marker_orientation": True,
-            "goal_qx": 0.0,
-            "goal_qy": 0.0,
-            "goal_qz": 0.0,
-            "goal_qw": 1.0,
-            "tf_timeout_sec": 0.5,
+            "goal_qx":                0.0,
+            "goal_qy":                0.0,
+            "goal_qz":                0.0,
+            "goal_qw":                1.0,
+            "tf_timeout_sec":         0.5,
         }
 
         for name, value in defaults.items():
             self.declare_parameter(name, value)
             setattr(self, name, self.get_parameter(name).value)
 
-        self.latest_pose: PoseStamped | None = None
+        self.latest_pose = None
         self.prev_is_stopped = False
         self.collecting = False
-        self.sample_buffer = list[PoseStamped] = []
+        self.sample_buffer = []          # 버그1 수정: list[PoseStamped] = [] → []
         self.delay_timer = None
 
         self.tf_buffer = tf2_ros.Buffer()
@@ -59,7 +60,7 @@ class WheelStopToGoalNode(Node):
             self.delay_timer.cancel()
             self.delay_timer = None
 
-     def _transform_to_goal_frame(self, pose_stamped):
+    def _transform_to_goal_frame(self, pose_stamped):  # 버그2 수정: 들여쓰기 1칸 제거
         src_frame = pose_stamped.header.frame_id
         try:
             transformed = self.tf_buffer.transform(
@@ -69,15 +70,15 @@ class WheelStopToGoalNode(Node):
             )
             return transformed
         except tf2_ros.LookupException as e:
-            self.get_logger().warn("[TF] LookupException  %s → %s : %s" % (src_frame, self.goal_frame, e))
+            self.get_logger().warn("[TF] LookupException  %s -> %s : %s" % (src_frame, self.goal_frame, e))
         except tf2_ros.ConnectivityException as e:
-            self.get_logger().warn("[TF] ConnectivityException  %s → %s : %s" % (src_frame, self.goal_frame, e))
+            self.get_logger().warn("[TF] ConnectivityException  %s -> %s : %s" % (src_frame, self.goal_frame, e))
         except tf2_ros.ExtrapolationException as e:
-            self.get_logger().warn("[TF] ExtrapolationException  %s → %s : %s" % (src_frame, self.goal_frame, e))
+            self.get_logger().warn("[TF] ExtrapolationException  %s -> %s : %s" % (src_frame, self.goal_frame, e))
         return None
-         
+
     def pose_callback(self, msg):
-        if not len(msg.poses):
+        if not msg.poses:
             return
 
         raw = PoseStamped()
@@ -87,12 +88,21 @@ class WheelStopToGoalNode(Node):
 
         if not self.collecting:
             return
+
+        # 버그3 수정: transformed 변수 없이 append 하던 것을 TF 변환 후 append로 수정
+        transformed = self._transform_to_goal_frame(copy.deepcopy(raw))
+        if transformed is None:
+            self.get_logger().warn(
+                "TF 변환 실패로 샘플 제외 (%d/%d)" % (len(self.sample_buffer), self.sample_count)
+            )
+            return
+
         self.sample_buffer.append(transformed)
 
         if len(self.sample_buffer) >= self.sample_count:
             self.publish_averaged_goal()
             self.reset_sampling()
-            
+
     def status_callback(self, msg):
         is_stopped = msg.data.strip().lower() == "stopped"
 
@@ -131,10 +141,10 @@ class WheelStopToGoalNode(Node):
         avg_x = sum(p.pose.position.x for p in self.sample_buffer) / n
         avg_y = sum(p.pose.position.y for p in self.sample_buffer) / n
         avg_z = sum(p.pose.position.z for p in self.sample_buffer) / n
-        
+
         goal_pose = copy.deepcopy(self.sample_buffer[-1])
         goal_pose.header.stamp = self.get_clock().now().to_msg()
-        goal_pose.header.frame_id = self.goal_frame  
+        goal_pose.header.frame_id = self.goal_frame
         goal_pose.pose.position.x = avg_x + self.offset_x
         goal_pose.pose.position.y = avg_y + self.offset_y
         goal_pose.pose.position.z = avg_z + self.offset_z
@@ -145,7 +155,7 @@ class WheelStopToGoalNode(Node):
             goal_pose.pose.orientation.z = self.goal_qz
             goal_pose.pose.orientation.w = self.goal_qw
 
-        self.goal_pub.publish(goal)
+        self.goal_pub.publish(goal_pose)  # 버그4 수정: goal → goal_pose
         self.get_logger().info(
             "Averaged pose published (in %s): x=%.4f y=%.4f z=%.4f"
             % (
@@ -162,7 +172,7 @@ def main(args=None):
     node = WheelStopToGoalNode()
     try:
         rclpy.spin(node)
-    except KeyboardIntterupt:
+    except KeyboardInterrupt:  # 버그5 수정: KeyboardIntterupt → KeyboardInterrupt
         pass
     finally:
         node.destroy_node()
