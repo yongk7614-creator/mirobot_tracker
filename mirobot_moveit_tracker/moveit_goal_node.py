@@ -81,7 +81,7 @@ class MoveItGoalNode(Node):
 
     def goal_pose_callback(self, msg: PoseStamped):
         self.get_logger().info(
-            "Received MoveIt goal request: frame=%s x=%.4f y=%.4f z=%.4f"
+            "Received MoveIt goal request: pos=%s, quat=%s"
             % (
                 msg.header.frame_id,
                 msg.pose.position.x,
@@ -165,7 +165,7 @@ class MoveItGoalNode(Node):
             
         if self.execute_motion:
             self.moveit2.wait_until_executed()
-            self.get_logger().info("MoveIt goal excution completed.")
+            self.get_logger().info("MoveIt goal execution completed.")
         else:
             self.get_logger().info("MoveIt goal was submitted without excution wait.")
             
