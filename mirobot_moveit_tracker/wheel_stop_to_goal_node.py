@@ -39,7 +39,7 @@ class WheelStopToGoalNode(Node):
         self.latest_pose = None
         self.prev_is_stopped = False
         self.collecting = False
-        self.sample_buffer = []          # 버그1 수정: list[PoseStamped] = [] → []
+        self.sample_buffer = []        
         self.delay_timer = None
 
         self.tf_buffer = tf2_ros.Buffer()
@@ -60,7 +60,7 @@ class WheelStopToGoalNode(Node):
             self.delay_timer.cancel()
             self.delay_timer = None
 
-    def _transform_to_goal_frame(self, pose_stamped):  # 버그2 수정: 들여쓰기 1칸 제거
+    def _transform_to_goal_frame(self, pose_stamped):  
         src_frame = pose_stamped.header.frame_id
         try:
             transformed = self.tf_buffer.transform(
@@ -89,7 +89,6 @@ class WheelStopToGoalNode(Node):
         if not self.collecting:
             return
 
-        # 버그3 수정: transformed 변수 없이 append 하던 것을 TF 변환 후 append로 수정
         transformed = self._transform_to_goal_frame(copy.deepcopy(raw))
         if transformed is None:
             self.get_logger().warn(
@@ -155,7 +154,7 @@ class WheelStopToGoalNode(Node):
             goal_pose.pose.orientation.z = self.goal_qz
             goal_pose.pose.orientation.w = self.goal_qw
 
-        self.goal_pub.publish(goal_pose)  # 버그4 수정: goal → goal_pose
+        self.goal_pub.publish(goal_pose)  
         self.get_logger().info(
             "Averaged pose published (in %s): x=%.4f y=%.4f z=%.4f"
             % (
@@ -172,7 +171,7 @@ def main(args=None):
     node = WheelStopToGoalNode()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:  # 버그5 수정: KeyboardIntterupt → KeyboardInterrupt
+    except KeyboardInterrupt:  
         pass
     finally:
         node.destroy_node()
