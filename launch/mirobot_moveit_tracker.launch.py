@@ -21,6 +21,7 @@ def generate_launch_description():
         DeclareLaunchArgument("goal_qy", default_value="0.0"),
         DeclareLaunchArgument("goal_qz", default_value="0.0"),
         DeclareLaunchArgument("goal_qw", default_value="1.0"),
+        DeclareLaunchArgument("tf_timeout_sec", default_value="0.5"),
         DeclareLaunchArgument("group_name", default_value="mirobot_group"),
         DeclareLaunchArgument("base_link_name", default_value="base_link"),
         DeclareLaunchArgument("end_effector_name", default_value="link6"),
@@ -52,6 +53,7 @@ def generate_launch_description():
         "goal_qy": ParameterValue(LaunchConfiguration("goal_qy"), value_type=float),
         "goal_qz": ParameterValue(LaunchConfiguration("goal_qz"), value_type=float),
         "goal_qw": ParameterValue(LaunchConfiguration("goal_qw"), value_type=float),
+        "tf_timeout_sec": ParameterValue(LaunchConfiguration("tf_timeout_sec"), value_type=float),
     }
 
     moveit_goal_parameters = {
@@ -59,6 +61,7 @@ def generate_launch_description():
         "group_name": LaunchConfiguration("group_name"),
         "base_link_name": LaunchConfiguration("base_link_name"),
         "end_effector_name": LaunchConfiguration("end_effector_name"),
+        "joint_names": LaunchConfiguration("joint_names"),
         "cartesian": ParameterValue(
             LaunchConfiguration("cartesian"), value_type=bool
         ),
