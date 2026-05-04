@@ -1,14 +1,13 @@
 import copy
 
 import rclpy
+import rclpy.duration
 from geometry_msgs.msg import PoseArray, PoseStamped
 from rclpy.node import Node
 from std_msgs.msg import String
 
-# tf2 관련 import 추가
 import tf2_ros
-import tf2_geometry_msgs  # PoseStamped 변환을 위해 필요
-
+import tf2_geometry_msgs  
 
 class WheelStopToGoalNode(Node):
     def __init__(self):
@@ -23,26 +22,25 @@ class WheelStopToGoalNode(Node):
             "offset_x": 0.0,
             "offset_y": 0.0,
             "offset_z": 0.0,
-            # [수정] goal_frame은 실제 변환 목적지 frame으로 사용
             "goal_frame": "base_link",
             "use_marker_orientation": True,
             "goal_qx": 0.0,
             "goal_qy": 0.0,
             "goal_qz": 0.0,
             "goal_qw": 1.0,
+            "tf_timeout_sec": 0.5,
         }
 
         for name, value in defaults.items():
             self.declare_parameter(name, value)
             setattr(self, name, self.get_parameter(name).value)
 
-        self.latest_pose = None
+        self.latest_pose: PoseStamped | None = None
         self.prev_is_stopped = False
         self.collecting = False
-        self.sample_buffer = []
+        self.sample_buffer = list[PoseStamped] = []
         self.delay_timer = None
 
-        # [추가] tf2 버퍼 및 리스너 초기화
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
@@ -61,24 +59,40 @@ class WheelStopToGoalNode(Node):
             self.delay_timer.cancel()
             self.delay_timer = None
 
+     def _transform_to_goal_frame(self, pose_stamped):
+        src_frame = pose_stamped.header.frame_id
+        try:
+            transformed = self.tf_buffer.transform(
+                pose_stamped,
+                self.goal_frame,
+                timeout=rclpy.duration.Duration(seconds=self.tf_timeout_sec),
+            )
+            return transformed
+        except tf2_ros.LookupException as e:
+            self.get_logger().warn("[TF] LookupException  %s → %s : %s" % (src_frame, self.goal_frame, e))
+        except tf2_ros.ConnectivityException as e:
+            self.get_logger().warn("[TF] ConnectivityException  %s → %s : %s" % (src_frame, self.goal_frame, e))
+        except tf2_ros.ExtrapolationException as e:
+            self.get_logger().warn("[TF] ExtrapolationException  %s → %s : %s" % (src_frame, self.goal_frame, e))
+        return None
+         
     def pose_callback(self, msg):
-        if len(msg.poses) == 0:
+        if not len(msg.poses):
             return
 
-        pose_msg = PoseStamped()
-        pose_msg.header = copy.deepcopy(msg.header)
-        pose_msg.pose = copy.deepcopy(msg.poses[0])
-        self.latest_pose = pose_msg
+        raw = PoseStamped()
+        raw.header = copy.deepcopy(msg.header)
+        raw.pose = copy.deepcopy(msg.poses[0])
+        self.latest_pose = raw
 
         if not self.collecting:
             return
+        self.sample_buffer.append(transformed)
 
-        self.sample_buffer.append(copy.deepcopy(pose_msg))
         if len(self.sample_buffer) >= self.sample_count:
             self.publish_averaged_goal()
-            self.collecting = False
-            self.sample_buffer = []
-
+            self.reset_sampling()
+            
     def status_callback(self, msg):
         is_stopped = msg.data.strip().lower() == "stopped"
 
@@ -113,53 +127,25 @@ class WheelStopToGoalNode(Node):
             self.get_logger().warn("No samples collected.")
             return
 
-        # [수정] 각 샘플을 개별적으로 goal_frame으로 tf 변환한 뒤 평균을 계산
-        transformed_samples = []
-        for sample in self.sample_buffer:
-            try:
-                # sample.header.frame_id = 카메라 광학 프레임
-                # self.goal_frame = "base_link"
-                transformed = self.tf_buffer.transform(
-                    sample,
-                    self.goal_frame,
-                    timeout=rclpy.duration.Duration(seconds=0.5),
-                )
-                transformed_samples.append(transformed)
-            except (
-                tf2_ros.LookupException,
-                tf2_ros.ConnectivityException,
-                tf2_ros.ExtrapolationException,
-            ) as e:
-                self.get_logger().warn(
-                    "TF transform failed for sample: %s. Skipping." % str(e)
-                )
-
-        if not transformed_samples:
-            self.get_logger().error(
-                "All TF transforms failed. Cannot publish goal."
-            )
-            return
-
-        # 변환된 샘플들로 평균 계산
-        avg_x = sum(p.pose.position.x for p in transformed_samples) / len(transformed_samples)
-        avg_y = sum(p.pose.position.y for p in transformed_samples) / len(transformed_samples)
-        avg_z = sum(p.pose.position.z for p in transformed_samples) / len(transformed_samples)
-
-        goal_pose = copy.deepcopy(transformed_samples[-1])
+        n = len(self.sample_buffer)
+        avg_x = sum(p.pose.position.x for p in self.sample_buffer) / n
+        avg_y = sum(p.pose.position.y for p in self.sample_buffer) / n
+        avg_z = sum(p.pose.position.z for p in self.sample_buffer) / n
+        
+        goal_pose = copy.deepcopy(self.sample_buffer[-1])
         goal_pose.header.stamp = self.get_clock().now().to_msg()
-        goal_pose.header.frame_id = self.goal_frame  # 이제 실제로 변환된 frame
+        goal_pose.header.frame_id = self.goal_frame  
         goal_pose.pose.position.x = avg_x + self.offset_x
         goal_pose.pose.position.y = avg_y + self.offset_y
         goal_pose.pose.position.z = avg_z + self.offset_z
 
-        # use_marker_orientation=True면 tf 변환된 orientation 사용 (이미 goal_frame 기준)
         if not self.use_marker_orientation:
             goal_pose.pose.orientation.x = self.goal_qx
             goal_pose.pose.orientation.y = self.goal_qy
             goal_pose.pose.orientation.z = self.goal_qz
             goal_pose.pose.orientation.w = self.goal_qw
 
-        self.goal_pub.publish(goal_pose)
+        self.goal_pub.publish(goal)
         self.get_logger().info(
             "Averaged pose published (in %s): x=%.4f y=%.4f z=%.4f"
             % (
@@ -176,6 +162,8 @@ def main(args=None):
     node = WheelStopToGoalNode()
     try:
         rclpy.spin(node)
+    except KeyboardIntterupt:
+        pass
     finally:
         node.destroy_node()
         rclpy.shutdown()
